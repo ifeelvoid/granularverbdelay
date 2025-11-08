@@ -17,10 +17,8 @@ public:
     {
         auto bounds = getLocalBounds();
 
-        // Draw background with gradient
-        g.setGradientFill(juce::ColourGradient(
-            juce::Colour(0xff0e0e0e), bounds.getX(), bounds.getY(),
-            juce::Colour(0xff1a1a1a), bounds.getX(), bounds.getBottom(), false));
+        // Draw dark background
+        g.setColour(juce::Colour(0xff0a0a0a));
         g.fillRect(bounds);
 
         // Get the ACTUAL delay buffer being granulated
@@ -30,71 +28,20 @@ public:
 
         if (bufferSize == 0) return;
 
-        // Draw center line and grid
-        g.setColour(juce::Colour(0xff2a2a2a));
-        auto centerY = bounds.getCentreY();
-        g.drawHorizontalLine(centerY, bounds.getX(), bounds.getRight());
-
-        g.setColour(juce::Colour(0xff1f1f1f));
-        for (int i = 1; i < 4; ++i)
-        {
-            auto y = bounds.getY() + (bounds.getHeight() * i / 4);
-            g.drawHorizontalLine(y, bounds.getX(), bounds.getRight());
-        }
-
-        // Calculate how many samples to display (1 second of audio at most)
-        int displaySamples = std::min(bufferSize, static_cast<int>(processor.getSampleRate() * 1.0));
+        // Calculate how many samples to display (2 seconds of audio)
+        int displaySamples = std::min(bufferSize, static_cast<int>(processor.getSampleRate() * 2.0));
         int startSample = (writePos - displaySamples + bufferSize) % bufferSize;
 
-        // Draw waveform from the delay buffer with glow effect
-        juce::Path waveformPath;
-        waveformPath.startNewSubPath(bounds.getX(), centerY);
+        // Split display into stereo channels
+        auto leftChannelBounds = bounds.removeFromTop(bounds.getHeight() / 2).reduced(4, 2);
+        auto rightChannelBounds = bounds.reduced(4, 2);
 
-        // Downsample for display to avoid drawing too many points
-        int step = std::max(1, displaySamples / bounds.getWidth());
+        // Draw both channels
+        drawChannel(g, leftChannelBounds, delayBuffer, 0, startSample, displaySamples, bufferSize, "L");
+        drawChannel(g, rightChannelBounds, delayBuffer, 1, startSample, displaySamples, bufferSize, "R");
 
-        for (int i = 0; i < displaySamples; i += step)
-        {
-            int bufferIndex = (startSample + i) % bufferSize;
-            float sample = delayBuffer.getSample(0, bufferIndex);
-
-            // Apply soft clipping for display
-            sample = std::tanh(sample * 2.0f) * 0.9f;
-
-            auto x = juce::jmap(static_cast<float>(i), 0.0f, static_cast<float>(displaySamples),
-                               static_cast<float>(bounds.getX()), static_cast<float>(bounds.getRight()));
-            auto y = juce::jmap(sample, -1.0f, 1.0f,
-                               static_cast<float>(bounds.getBottom()), static_cast<float>(bounds.getY()));
-
-            waveformPath.lineTo(x, y);
-        }
-
-        waveformPath.lineTo(bounds.getRight(), centerY);
-        waveformPath.closeSubPath();
-
-        // Draw glow effect (multiple layers)
-        g.setColour(juce::Colour(0xff00a8ff).withAlpha(0.15f));
-        g.strokePath(waveformPath, juce::PathStrokeType(10.0f));
-
-        g.setColour(juce::Colour(0xff00a8ff).withAlpha(0.4f));
-        g.strokePath(waveformPath, juce::PathStrokeType(5.0f));
-
-        // Draw bright waveform line
-        g.setColour(juce::Colour(0xff00d4ff));
-        g.strokePath(waveformPath, juce::PathStrokeType(2.5f));
-
-        // Fill waveform area
-        g.setGradientFill(juce::ColourGradient(
-            juce::Colour(0xff00a8ff).withAlpha(0.25f), bounds.getX(), bounds.getY(),
-            juce::Colour(0xff00a8ff).withAlpha(0.05f), bounds.getX(), centerY, false));
-        g.fillPath(waveformPath);
-
-        // Draw write position indicator (playhead)
-        float writeX = bounds.getRight() - 2.0f; // Write position is always at the right edge
-        g.setColour(juce::Colour(0xff00ff00).withAlpha(0.6f));
-        g.fillRect(writeX - 2.0f, static_cast<float>(bounds.getY()), 4.0f, static_cast<float>(bounds.getHeight()));
-
-        // Draw grain positions - map them to the visible window
+        // Draw grain positions on top
+        auto fullBounds = getLocalBounds();
         auto& grainPositions = processor.getGrainPositions();
 
         for (size_t i = 0; i < grainPositions.size(); ++i)
@@ -110,41 +57,115 @@ public:
                 continue;
 
             auto x = juce::jmap(static_cast<float>(relativePos), 0.0f, static_cast<float>(displaySamples),
-                               static_cast<float>(bounds.getX()), static_cast<float>(bounds.getRight()));
+                               static_cast<float>(fullBounds.getX()), static_cast<float>(fullBounds.getRight()));
 
-            // Vary opacity for visual interest
-            float alpha = 0.7f + 0.3f * (i % 3) / 3.0f;
+            // Draw bright vertical line for grain position
+            g.setColour(juce::Colour(0xffff9500).withAlpha(0.85f));
+            g.drawLine(x, fullBounds.getY(), x, fullBounds.getBottom(), 2.0f);
 
-            // Draw glow behind grain marker
-            g.setColour(juce::Colour(0xffff6b35).withAlpha(alpha * 0.4f));
-            g.fillEllipse(x - 12, bounds.getY() + 6, 24, 24);
-
-            // Draw vertical line
-            juce::ColourGradient gradient(
-                juce::Colour(0xffff6b35).withAlpha(alpha),
-                x, bounds.getY(),
-                juce::Colour(0xffff6b35).withAlpha(alpha * 0.2f),
-                x, bounds.getBottom(), false);
-            g.setGradientFill(gradient);
-            g.fillRect(x - 2.0f, static_cast<float>(bounds.getY()), 4.0f, static_cast<float>(bounds.getHeight()));
-
-            // Draw grain marker circle
-            g.setColour(juce::Colour(0xffff8c4f));
-            g.fillEllipse(x - 6, bounds.getY() + 8, 12, 12);
-
-            // Bright center dot
+            // Draw marker dot at top
+            g.setColour(juce::Colour(0xffffaa00));
+            g.fillEllipse(x - 4, fullBounds.getY() + 4, 8, 8);
             g.setColour(juce::Colour(0xffffffff));
-            g.fillEllipse(x - 3, bounds.getY() + 11, 6, 6);
+            g.fillEllipse(x - 2, fullBounds.getY() + 6, 4, 4);
         }
+
+        // Draw playhead at write position (right edge)
+        float writeX = fullBounds.getRight() - 4.0f;
+        g.setColour(juce::Colour(0xff00ff00).withAlpha(0.8f));
+        g.drawLine(writeX, fullBounds.getY(), writeX, fullBounds.getBottom(), 3.0f);
 
         // Draw border
         g.setColour(juce::Colour(0xff404040));
-        g.drawRect(bounds, 2);
+        g.drawRect(getLocalBounds(), 2);
 
         // Draw info text
-        g.setColour(juce::Colour(0xff888888));
-        g.setFont(11.0f);
-        g.drawText("← 1 second of delay buffer →", bounds.getX() + 5, bounds.getBottom() - 18, bounds.getWidth() - 10, 15, juce::Justification::centredLeft);
+        g.setColour(juce::Colour(0xffaaaaaa));
+        g.setFont(juce::Font(11.0f, juce::Font::bold));
+        g.drawText("← 2 SECONDS →", fullBounds.getX() + 8, fullBounds.getY() + 4, 120, 14, juce::Justification::left);
+    }
+
+    void drawChannel(juce::Graphics& g, juce::Rectangle<int> bounds,
+                     const juce::AudioBuffer<float>& buffer, int channel,
+                     int startSample, int displaySamples, int bufferSize, const juce::String& label)
+    {
+        if (bounds.getWidth() <= 0 || bounds.getHeight() <= 0) return;
+
+        auto centerY = bounds.getCentreY();
+
+        // Draw grid lines
+        g.setColour(juce::Colour(0xff1a1a1a));
+        g.drawHorizontalLine(centerY, bounds.getX(), bounds.getRight());
+        g.drawHorizontalLine(bounds.getY() + bounds.getHeight() * 0.25f, bounds.getX(), bounds.getRight());
+        g.drawHorizontalLine(bounds.getY() + bounds.getHeight() * 0.75f, bounds.getX(), bounds.getRight());
+
+        // Draw channel label
+        g.setColour(juce::Colour(0xff666666));
+        g.setFont(juce::Font(10.0f, juce::Font::bold));
+        g.drawText(label, bounds.getX() + 4, bounds.getY() + 2, 20, 12, juce::Justification::left);
+
+        // Calculate samples per pixel for RMS/peak display
+        int samplesPerPixel = std::max(1, displaySamples / bounds.getWidth());
+
+        // Draw waveform bars (DAW-style)
+        for (int x = 0; x < bounds.getWidth(); ++x)
+        {
+            // Calculate which samples this pixel represents
+            int sampleStart = x * samplesPerPixel;
+            int sampleEnd = std::min(sampleStart + samplesPerPixel, displaySamples);
+
+            // Find peak and RMS for this range
+            float peak = 0.0f;
+            float rms = 0.0f;
+
+            for (int s = sampleStart; s < sampleEnd; ++s)
+            {
+                int bufferIndex = (startSample + s) % bufferSize;
+                float sample = buffer.getSample(channel, bufferIndex);
+
+                peak = std::max(peak, std::abs(sample));
+                rms += sample * sample;
+            }
+
+            rms = std::sqrt(rms / (sampleEnd - sampleStart));
+
+            // Normalize and clip
+            peak = std::min(1.0f, peak);
+            rms = std::min(1.0f, rms);
+
+            // Calculate bar heights
+            float peakHeight = peak * (bounds.getHeight() / 2.0f);
+            float rmsHeight = rms * (bounds.getHeight() / 2.0f);
+
+            float pixelX = bounds.getX() + x;
+
+            // Draw peak (brighter, thinner)
+            if (peak > 0.01f)
+            {
+                // Color based on level (green -> yellow -> red)
+                juce::Colour peakColor;
+                if (peak < 0.7f)
+                    peakColor = juce::Colour(0xff00d4ff); // Cyan for normal levels
+                else if (peak < 0.9f)
+                    peakColor = juce::Colour(0xffffa500); // Orange for hot levels
+                else
+                    peakColor = juce::Colour(0xffff3333); // Red for clipping
+
+                // Draw positive peak
+                g.setColour(peakColor.withAlpha(0.9f));
+                g.drawVerticalLine(pixelX, centerY - peakHeight, centerY);
+
+                // Draw negative peak
+                g.drawVerticalLine(pixelX, centerY, centerY + peakHeight);
+            }
+
+            // Draw RMS (dimmer, shows average level)
+            if (rms > 0.005f)
+            {
+                g.setColour(juce::Colour(0xff008fb3).withAlpha(0.6f));
+                g.drawVerticalLine(pixelX, centerY - rmsHeight, centerY + rmsHeight);
+            }
+        }
     }
 
     void timerCallback() override
