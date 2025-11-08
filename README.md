@@ -108,9 +108,9 @@ copy build\GranularVerbDelay_artefacts\Release\VST3\*.vst3 "C:\Program Files\Com
 
 ## Requirements for Building
 
-- JUCE 7.0.9 (automatically downloaded)
+- JUCE 7.0.12 (automatically downloaded)
 - CMake 3.15 or later
 - C++17 compatible compiler
-- **macOS:** Xcode Command Line Tools
+- **macOS:** Xcode Command Line Tools (for macOS 15 Sequoia support)
 - **Linux:** GCC/Clang, X11/ALSA dev packages
 - **Windows:** Visual Studio 2019 or later

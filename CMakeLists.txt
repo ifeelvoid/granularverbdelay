@@ -10,6 +10,9 @@ if(APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
     # Optional: Set specific architecture (arm64 for M1/M2/M3, x86_64 for Intel, or "arm64;x86_64" for Universal)
     # set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "macOS architectures")
+
+    # Suppress deprecation warnings on macOS 15 (warnings are OK, errors are not)
+    add_compile_options(-Wno-deprecated-declarations)
 endif()
 
 # Add JUCE as a subdirectory (you'll need to clone JUCE into this directory)
@@ -18,7 +21,7 @@ include(FetchContent)
 FetchContent_Declare(
     JUCE
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG 7.0.9
+    GIT_TAG 7.0.12
 )
 FetchContent_MakeAvailable(JUCE)
 
