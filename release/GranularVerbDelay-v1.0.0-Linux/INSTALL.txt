@@ -1,0 +1,89 @@
+GRANULAR VERB DELAY v1.0.0 - Installation Guide
+================================================
+
+Thank you for downloading Granular Verb Delay!
+
+CONTENTS
+--------
+This package contains:
+- VST3/               VST3 plugin bundle
+- Standalone/         Standalone application
+- README.md           Plugin documentation
+- INSTALL.txt         This file
+
+INSTALLATION
+------------
+
+VST3 Plugin (for use in DAWs like Ableton Live):
+-------------------------------------------------
+1. Copy the entire "Granular Verb Delay.vst3" folder from the VST3 directory
+2. Paste it into your VST3 plugin folder:
+
+   Linux:   ~/.vst3/
+
+   (Create the directory if it doesn't exist)
+
+3. Rescan plugins in your DAW
+4. The plugin should appear as "Granular Verb Delay" in your plugin list
+
+Standalone Application:
+-----------------------
+1. The "Granular Verb Delay" executable in the Standalone folder can be run directly
+2. You may want to copy it to a convenient location like ~/bin or /usr/local/bin
+3. Make it executable if needed: chmod +x "Granular Verb Delay"
+
+USAGE IN ABLETON LIVE
+---------------------
+1. Open Ableton Live
+2. Navigate to Audio Effects in the browser
+3. Find "Granular Verb Delay" under your plugin manufacturer
+4. Drag it onto an audio track or return track
+5. Adjust parameters to taste!
+
+PLUGIN PARAMETERS
+-----------------
+- Delay Time:     Length of the delay (10ms - 2s)
+- Grain Size:     Size of individual grains (10ms - 500ms)
+- Grain Density:  Number of grains spawned (1-100/sec)
+- Grain Pitch:    Pitch shift for grains (0.5x - 2.0x)
+- Reverb Mix:     Amount of reverb (0-100%)
+- Stereo Width:   Stereo field width (0-200%)
+- Feedback:       Delay regeneration (0-95%)
+- Dry/Wet:        Mix between dry and wet signal (0-100%)
+
+VISUAL FEEDBACK
+---------------
+The top display shows:
+- Blue waveform: Current input signal
+- Red markers:   Active grain positions
+
+TROUBLESHOOTING
+---------------
+Q: Plugin doesn't show up in Ableton
+A: Make sure you copied the ENTIRE .vst3 folder, not just the .so file
+   Rescan your plugins (Preferences > Plug-Ins > Rescan)
+
+Q: No sound output
+A: Check that your Dry/Wet mix isn't at 0%
+   Verify Grain Density is above 0
+
+Q: Crackling or glitches
+A: Try increasing your buffer size in your DAW preferences
+   Reduce the number of active grains (lower Grain Density)
+
+SYSTEM REQUIREMENTS
+-------------------
+- Linux distribution (Ubuntu 18.04+ or equivalent)
+- x86_64 architecture
+- VST3 compatible DAW or standalone usage
+- Minimum: 2GB RAM, Dual-core CPU
+
+SUPPORT
+-------
+For issues and feature requests:
+https://github.com/ifeelvoid/granularverbdelay
+
+Built with JUCE 7.0.9
+Copyright (c) 2025
+
+Enjoy creating lush, granular soundscapes!

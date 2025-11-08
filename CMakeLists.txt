@@ -26,7 +26,7 @@ juce_add_plugin(GranularVerbDelay
     COPY_PLUGIN_AFTER_BUILD TRUE
     PLUGIN_MANUFACTURER_CODE Manu
     PLUGIN_CODE Gvdl
-    FORMATS AU VST3 Standalone
+    FORMATS VST3 Standalone
     PRODUCT_NAME "Granular Verb Delay"
 )
 
