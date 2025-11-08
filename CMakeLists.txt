@@ -5,6 +5,13 @@ project(GranularVerbDelay VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# macOS specific settings for Sequoia (macOS 15) compatibility
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
+    # Optional: Set specific architecture (arm64 for M1/M2/M3, x86_64 for Intel, or "arm64;x86_64" for Universal)
+    # set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "macOS architectures")
+endif()
+
 # Add JUCE as a subdirectory (you'll need to clone JUCE into this directory)
 # Or use FetchContent to download it automatically
 include(FetchContent)
@@ -15,19 +22,49 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+# Platform-specific plugin formats
+if(APPLE)
+    set(PLUGIN_FORMATS AU VST3 Standalone)
+elseif(WIN32)
+    set(PLUGIN_FORMATS VST3 Standalone)
+else()
+    set(PLUGIN_FORMATS VST3 Standalone)
+endif()
+
 # Add your plugin target
 juce_add_plugin(GranularVerbDelay
-    COMPANY_NAME "YourCompany"
+    COMPANY_NAME "GranularAudio"
+    COMPANY_WEBSITE "https://github.com/ifeelvoid/granularverbdelay"
+    COMPANY_EMAIL "support@granularaudio.dev"
+    BUNDLE_ID "dev.granularaudio.GranularVerbDelay"
+
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     COPY_PLUGIN_AFTER_BUILD TRUE
-    PLUGIN_MANUFACTURER_CODE Manu
-    PLUGIN_CODE Gvdl
-    FORMATS VST3 Standalone
+
+    PLUGIN_MANUFACTURER_CODE Grau
+    PLUGIN_CODE GvDl
+
+    FORMATS ${PLUGIN_FORMATS}
     PRODUCT_NAME "Granular Verb Delay"
+
+    # macOS specific settings
+    AU_MAIN_TYPE kAudioUnitType_Effect
+
+    # VST3 category
+    VST3_CATEGORIES "Fx" "Delay" "Reverb"
+
+    # Description
+    DESCRIPTION "Granular delay and reverb effect with stereo width control"
+
+    # For macOS code signing (optional but reduces warnings)
+    # Set to empty string or "ad-hoc" for local builds
+    # Set to your Developer ID for distribution
+    # HARDENED_RUNTIME_ENABLED TRUE
+    # HARDENED_RUNTIME_OPTIONS "com.apple.security.device.audio-input"
 )
 
 # Add source files
