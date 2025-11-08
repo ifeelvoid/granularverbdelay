@@ -59,12 +59,22 @@ private:
     // Granular synthesis grain structure
     struct Grain
     {
-        int position = 0;
-        int age = 0;
-        int lifetime = 0;
-        float amplitude = 0.0f;
-        int readPosition = 0;
+        double age = 0.0;
+        double lifetime = 0.0;
+        double readPosition = 0.0;
+        double playbackSpeed = 1.0;
+        float amplitude = 1.0f;
         bool active = false;
+
+        void reset()
+        {
+            age = 0.0;
+            lifetime = 0.0;
+            readPosition = 0.0;
+            playbackSpeed = 1.0;
+            amplitude = 1.0f;
+            active = false;
+        }
     };
 
     // Audio processing members

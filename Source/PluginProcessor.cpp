@@ -187,39 +187,48 @@ void GranularVerbDelayAudioProcessor::updateGrains(int numSamples)
 {
     auto grainDensity = apvts.getRawParameterValue("grainDensity")->load();
     auto grainSize = apvts.getRawParameterValue("grainSize")->load();
+    auto grainPitch = apvts.getRawParameterValue("grainPitch")->load();
+    auto delayTime = apvts.getRawParameterValue("delayTime")->load();
 
     grainPositions.clear();
 
-    // Calculate grain spawn probability based on density
-    float spawnProbability = grainDensity / 100.0f;
+    // Calculate grains per second, then samples between grain spawns
+    float grainsPerSecond = grainDensity;
+    float samplesPerGrain = getSampleRate() / std::max(0.1f, grainsPerSecond);
+    float spawnChance = 1.0f / samplesPerGrain;
+
+    const int delayBufferSize = delayBuffer.getNumSamples();
+    int delayOffset = static_cast<int>(delayTime * getSampleRate());
 
     for (auto& grain : grains)
     {
         if (grain.active)
         {
-            grain.age++;
-            if (grain.age >= grain.lifetime)
+            // Collect positions for visualization
+            if (grain.age < grain.lifetime * 0.5)  // Only show first half for cleaner visual
             {
-                grain.active = false;
-            }
-            else
-            {
-                grainPositions.push_back(static_cast<float>(grain.readPosition) / delayBuffer.getNumSamples());
+                int visualPos = static_cast<int>(grain.readPosition) % delayBufferSize;
+                grainPositions.push_back(static_cast<float>(visualPos) / delayBufferSize);
             }
         }
-        else if (randomDistribution(randomEngine) < spawnProbability * 0.01f)
+        else if (randomDistribution(randomEngine) < spawnChance)
         {
             // Spawn new grain
             grain.active = true;
-            grain.age = 0;
-            grain.lifetime = static_cast<int>(grainSize * getSampleRate() / 1000.0f);
-            grain.amplitude = 0.5f + randomDistribution(randomEngine) * 0.5f;
+            grain.age = 0.0;
+            grain.lifetime = (grainSize / 1000.0) * getSampleRate();  // Convert ms to samples
+            grain.playbackSpeed = grainPitch;
 
-            auto delayTime = apvts.getRawParameterValue("delayTime")->load();
-            int maxDelay = static_cast<int>(delayTime * getSampleRate());
-            grain.readPosition = (writePosition - maxDelay + delayBuffer.getNumSamples()) % delayBuffer.getNumSamples();
+            // Add some randomization for richer sound (like M4L spray parameter)
+            float spray = (randomDistribution(randomEngine) - 0.5f) * 0.1f;  // ±10% variation
+            grain.amplitude = 0.8f + randomDistribution(randomEngine) * 0.4f;  // 0.8 to 1.2
 
-            grainPositions.push_back(static_cast<float>(grain.readPosition) / delayBuffer.getNumSamples());
+            // Set initial read position with slight randomization
+            int basePos = (writePosition - delayOffset + delayBufferSize) % delayBufferSize;
+            int sprayOffset = static_cast<int>(spray * getSampleRate() * 0.1);  // Max 100ms spray
+            grain.readPosition = (basePos + sprayOffset + delayBufferSize) % delayBufferSize;
+
+            grainPositions.push_back(static_cast<float>(grain.readPosition) / delayBufferSize);
         }
     }
 }
@@ -251,7 +260,7 @@ void GranularVerbDelayAudioProcessor::processGranularDelay(juce::AudioBuffer<flo
     const int delayBufferSize = delayBuffer.getNumSamples();
 
     auto feedback = apvts.getRawParameterValue("feedback")->load();
-    auto grainPitch = apvts.getRawParameterValue("grainPitch")->load();
+    feedback = juce::jlimit(0.0f, 0.95f, feedback);  // Clamp feedback to prevent runaway
 
     updateGrains(numSamples);
 
@@ -262,35 +271,67 @@ void GranularVerbDelayAudioProcessor::processGranularDelay(juce::AudioBuffer<flo
 
         for (int i = 0; i < numSamples; ++i)
         {
-            // Write to delay buffer with feedback
+            // First, write input to delay buffer (no feedback yet)
             int writeIndex = (writePosition + i) % delayBufferSize;
-            delayData[writeIndex] = channelData[i] + delayData[writeIndex] * feedback;
+            float inputSample = channelData[i];
 
             // Read from active grains
             float grainOutput = 0.0f;
-            int activeGrains = 0;
+            int activeGrainCount = 0;
 
             for (auto& grain : grains)
             {
                 if (grain.active)
                 {
-                    // Apply envelope (Hann window)
-                    float phase = static_cast<float>(grain.age) / grain.lifetime;
-                    float envelope = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * phase));
+                    // Calculate envelope (Hann window for smooth fades)
+                    double phase = grain.age / grain.lifetime;
 
-                    // Read from delay buffer with pitch shifting
-                    float readPos = grain.readPosition + (grain.age * grainPitch);
-                    int readIndex = static_cast<int>(readPos) % delayBufferSize;
+                    if (phase >= 1.0)
+                    {
+                        grain.active = false;
+                        continue;
+                    }
 
-                    grainOutput += delayData[readIndex] * envelope * grain.amplitude;
-                    activeGrains++;
+                    float envelope = 0.5f * (1.0f - std::cos(2.0 * juce::MathConstants<double>::pi * phase));
+
+                    // Linear interpolation for smooth grain playback
+                    double readPos = grain.readPosition;
+                    int readIndex0 = static_cast<int>(readPos) % delayBufferSize;
+                    int readIndex1 = (readIndex0 + 1) % delayBufferSize;
+                    float frac = static_cast<float>(readPos - std::floor(readPos));
+
+                    // Interpolated read from delay buffer
+                    float sample0 = delayData[readIndex0];
+                    float sample1 = delayData[readIndex1];
+                    float sample = sample0 + frac * (sample1 - sample0);
+
+                    grainOutput += sample * envelope * grain.amplitude;
+                    activeGrainCount++;
+
+                    // Advance grain playback position
+                    grain.readPosition += grain.playbackSpeed;
+                    grain.age += 1.0;
+
+                    // Wrap around buffer
+                    if (grain.readPosition >= delayBufferSize)
+                        grain.readPosition -= delayBufferSize;
+                    else if (grain.readPosition < 0)
+                        grain.readPosition += delayBufferSize;
                 }
             }
 
-            if (activeGrains > 0)
-                grainOutput /= std::sqrt(static_cast<float>(activeGrains)); // Normalize
+            // Normalize grain output to prevent volume buildup
+            if (activeGrainCount > 0)
+                grainOutput *= 1.0f / std::sqrt(static_cast<float>(activeGrainCount));
 
+            // Write grain output back to delay buffer with feedback
+            delayData[writeIndex] = inputSample + grainOutput * feedback;
+
+            // Output the grain result
             channelData[i] = grainOutput;
+
+            // Apply soft clipping to prevent overflow
+            channelData[i] = std::tanh(channelData[i]);
         }
     }
 

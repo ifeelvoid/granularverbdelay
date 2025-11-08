@@ -48,35 +48,59 @@ void GranularVerbDelayAudioProcessorEditor::setupSlider(juce::Slider& slider, ju
 {
     addAndMakeVisible(slider);
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 20);
+    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 85, 22);
+    slider.setRotaryParameters(juce::MathConstants<float>::pi * 1.25f,
+                                juce::MathConstants<float>::pi * 2.75f,
+                                true);
 
     addAndMakeVisible(label);
     label.setText(labelText, juce::dontSendNotification);
     label.setJustificationType(juce::Justification::centred);
     label.attachToComponent(&slider, false);
 
-    // Styling
-    slider.setColour(juce::Slider::rotarySliderFillColourId, juce::Colour(0xff4a9eff));
+    // Modern styling with gradients
+    slider.setColour(juce::Slider::rotarySliderFillColourId, juce::Colour(0xff00d4ff));
+    slider.setColour(juce::Slider::rotarySliderOutlineColourId, juce::Colour(0xff2a2a2a));
     slider.setColour(juce::Slider::thumbColourId, juce::Colour(0xffffffff));
-    label.setColour(juce::Label::textColourId, juce::Colour(0xffffffff));
+    slider.setColour(juce::Slider::textBoxTextColourId, juce::Colour(0xffdddddd));
+    slider.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xff1a1a1a));
+    slider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colour(0xff3a3a3a));
+
+    label.setColour(juce::Label::textColourId, juce::Colour(0xffaaaaaa));
+    label.setFont(juce::Font(14.0f, juce::Font::bold));
+
+    // Sensitivity adjustment for better feel
+    slider.setMouseDragSensitivity(150);
 }
 
 //==============================================================================
 void GranularVerbDelayAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    // Background gradient
-    g.fillAll(juce::Colour(0xff0a0a0a));
+    // Background with subtle gradient
+    g.setGradientFill(juce::ColourGradient(
+        juce::Colour(0xff0a0a0a), 0, 0,
+        juce::Colour(0xff151515), 0, getHeight(), false));
+    g.fillAll();
 
     auto bounds = getLocalBounds();
 
-    // Draw title
-    g.setColour(juce::Colours::white);
-    g.setFont(juce::Font(28.0f, juce::Font::bold));
-    g.drawText("Granular Verb Delay", bounds.removeFromTop(50), juce::Justification::centred);
+    // Draw title with glow
+    g.setColour(juce::Colour(0xff00d4ff).withAlpha(0.1f));
+    g.setFont(juce::Font(32.0f, juce::Font::bold));
+    g.drawText("GRANULAR VERB DELAY", bounds.getX(), 10, bounds.getWidth(), 50,
+               juce::Justification::centred);
 
-    // Draw sections
+    g.setColour(juce::Colour(0xffffffff));
+    g.setFont(juce::Font(28.0f, juce::Font::bold));
+    g.drawText("GRANULAR VERB DELAY", bounds.getX(), 12, bounds.getWidth(), 50,
+               juce::Justification::centred);
+
+    // Draw control sections with subtle borders
+    g.setColour(juce::Colour(0xff1f1f1f));
+    g.fillRoundedRectangle(10, 250, getWidth() - 20, 330, 4.0f);
+
     g.setColour(juce::Colour(0xff2a2a2a));
-    g.fillRect(10, 250, getWidth() - 20, 330);
+    g.drawRoundedRectangle(10, 250, getWidth() - 20, 330, 4.0f, 1.0f);
 }
 
 void GranularVerbDelayAudioProcessorEditor::resized()
