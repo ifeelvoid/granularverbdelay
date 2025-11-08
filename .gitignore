@@ -1,0 +1,27 @@
+# Build directories
+build/
+cmake-build-*/
+Builds/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# JUCE
+JuceLibraryCode/
+
+# Compiled files
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
