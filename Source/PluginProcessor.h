@@ -50,8 +50,9 @@ public:
     // Audio parameters
     juce::AudioProcessorValueTreeState& getValueTreeState() { return apvts; }
 
-    // For visual feedback
-    juce::AudioBuffer<float>& getVisualizationBuffer() { return visualizationBuffer; }
+    // For visual feedback - now shows the ACTUAL delay buffer being granulated
+    juce::AudioBuffer<float>& getDelayBuffer() { return delayBuffer; }
+    int getWritePosition() const { return writePosition; }
     std::vector<float>& getGrainPositions() { return grainPositions; }
 
 private:
