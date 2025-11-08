@@ -12,11 +12,15 @@ GranularVerbDelayAudioProcessorEditor::GranularVerbDelayAudioProcessorEditor (Gr
     setupSlider(delayTimeSlider, delayTimeLabel, "Delay Time");
     setupSlider(grainSizeSlider, grainSizeLabel, "Grain Size");
     setupSlider(grainDensitySlider, grainDensityLabel, "Grain Density");
+    setupSlider(grainPitchSlider, grainPitchLabel, "Grain Pitch");
+    setupSlider(spraySlider, sprayLabel, "Spray");
+    setupSlider(grainSizeVarSlider, grainSizeVarLabel, "Size Var");
+    setupSlider(grainPitchVarSlider, grainPitchVarLabel, "Pitch Var");
+    setupSlider(filePositionSlider, filePositionLabel, "File Position");
     setupSlider(reverbMixSlider, reverbMixLabel, "Reverb Mix");
     setupSlider(stereoWidthSlider, stereoWidthLabel, "Stereo Width");
     setupSlider(dryWetSlider, dryWetLabel, "Dry/Wet");
     setupSlider(feedbackSlider, feedbackLabel, "Feedback");
-    setupSlider(grainPitchSlider, grainPitchLabel, "Grain Pitch");
 
     // Create attachments
     delayTimeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -25,6 +29,16 @@ GranularVerbDelayAudioProcessorEditor::GranularVerbDelayAudioProcessorEditor (Gr
         audioProcessor.getValueTreeState(), "grainSize", grainSizeSlider);
     grainDensityAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         audioProcessor.getValueTreeState(), "grainDensity", grainDensitySlider);
+    grainPitchAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), "grainPitch", grainPitchSlider);
+    sprayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), "spray", spraySlider);
+    grainSizeVarAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), "grainSizeVar", grainSizeVarSlider);
+    grainPitchVarAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), "grainPitchVar", grainPitchVarSlider);
+    filePositionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), "filePosition", filePositionSlider);
     reverbMixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         audioProcessor.getValueTreeState(), "reverbMix", reverbMixSlider);
     stereoWidthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -33,11 +47,9 @@ GranularVerbDelayAudioProcessorEditor::GranularVerbDelayAudioProcessorEditor (Gr
         audioProcessor.getValueTreeState(), "dryWet", dryWetSlider);
     feedbackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         audioProcessor.getValueTreeState(), "feedback", feedbackSlider);
-    grainPitchAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        audioProcessor.getValueTreeState(), "grainPitch", grainPitchSlider);
 
-    // Set component size
-    setSize (800, 600);
+    // Set component size - taller to fit more controls
+    setSize (800, 700);
 }
 
 GranularVerbDelayAudioProcessorEditor::~GranularVerbDelayAudioProcessorEditor()
@@ -97,10 +109,10 @@ void GranularVerbDelayAudioProcessorEditor::paint (juce::Graphics& g)
 
     // Draw control sections with subtle borders
     g.setColour(juce::Colour(0xff1f1f1f));
-    g.fillRoundedRectangle(10, 250, getWidth() - 20, 330, 4.0f);
+    g.fillRoundedRectangle(10, 250, getWidth() - 20, 430, 4.0f);
 
     g.setColour(juce::Colour(0xff2a2a2a));
-    g.drawRoundedRectangle(10, 250, getWidth() - 20, 330, 4.0f, 1.0f);
+    g.drawRoundedRectangle(10, 250, getWidth() - 20, 430, 4.0f, 1.0f);
 }
 
 void GranularVerbDelayAudioProcessorEditor::resized()
@@ -116,21 +128,28 @@ void GranularVerbDelayAudioProcessorEditor::resized()
     // Control section
     auto controlBounds = bounds.reduced(20);
 
-    // Create 2 rows of 4 controls
-    auto row1 = controlBounds.removeFromTop(150);
-    auto row2 = controlBounds.removeFromTop(150);
+    // Create 3 rows of 4 controls each
+    auto row1 = controlBounds.removeFromTop(140);
+    auto row2 = controlBounds.removeFromTop(140);
+    auto row3 = controlBounds.removeFromTop(140);
 
     auto sliderWidth = row1.getWidth() / 4;
 
-    // Row 1: Delay, Grain Size, Grain Density, Grain Pitch
+    // Row 1: Core Granular Controls
     delayTimeSlider.setBounds(row1.removeFromLeft(sliderWidth).reduced(10));
     grainSizeSlider.setBounds(row1.removeFromLeft(sliderWidth).reduced(10));
     grainDensitySlider.setBounds(row1.removeFromLeft(sliderWidth).reduced(10));
     grainPitchSlider.setBounds(row1.removeFromLeft(sliderWidth).reduced(10));
 
-    // Row 2: Reverb, Stereo Width, Feedback, Dry/Wet
-    reverbMixSlider.setBounds(row2.removeFromLeft(sliderWidth).reduced(10));
-    stereoWidthSlider.setBounds(row2.removeFromLeft(sliderWidth).reduced(10));
-    feedbackSlider.setBounds(row2.removeFromLeft(sliderWidth).reduced(10));
-    dryWetSlider.setBounds(row2.removeFromLeft(sliderWidth).reduced(10));
+    // Row 2: Granulator III-Style Controls (Spray, Variations, Position)
+    spraySlider.setBounds(row2.removeFromLeft(sliderWidth).reduced(10));
+    grainSizeVarSlider.setBounds(row2.removeFromLeft(sliderWidth).reduced(10));
+    grainPitchVarSlider.setBounds(row2.removeFromLeft(sliderWidth).reduced(10));
+    filePositionSlider.setBounds(row2.removeFromLeft(sliderWidth).reduced(10));
+
+    // Row 3: Mix/Effects Controls
+    reverbMixSlider.setBounds(row3.removeFromLeft(sliderWidth).reduced(10));
+    stereoWidthSlider.setBounds(row3.removeFromLeft(sliderWidth).reduced(10));
+    feedbackSlider.setBounds(row3.removeFromLeft(sliderWidth).reduced(10));
+    dryWetSlider.setBounds(row3.removeFromLeft(sliderWidth).reduced(10));
 }

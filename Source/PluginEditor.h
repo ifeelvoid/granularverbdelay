@@ -176,30 +176,42 @@ private:
     juce::Slider delayTimeSlider;
     juce::Slider grainSizeSlider;
     juce::Slider grainDensitySlider;
+    juce::Slider grainPitchSlider;
+    juce::Slider spraySlider;
+    juce::Slider grainSizeVarSlider;
+    juce::Slider grainPitchVarSlider;
+    juce::Slider filePositionSlider;
     juce::Slider reverbMixSlider;
     juce::Slider stereoWidthSlider;
     juce::Slider dryWetSlider;
     juce::Slider feedbackSlider;
-    juce::Slider grainPitchSlider;
 
     juce::Label delayTimeLabel;
     juce::Label grainSizeLabel;
     juce::Label grainDensityLabel;
+    juce::Label grainPitchLabel;
+    juce::Label sprayLabel;
+    juce::Label grainSizeVarLabel;
+    juce::Label grainPitchVarLabel;
+    juce::Label filePositionLabel;
     juce::Label reverbMixLabel;
     juce::Label stereoWidthLabel;
     juce::Label dryWetLabel;
     juce::Label feedbackLabel;
-    juce::Label grainPitchLabel;
 
     // Attachments
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayTimeAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> grainSizeAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> grainDensityAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> grainPitchAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> sprayAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> grainSizeVarAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> grainPitchVarAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filePositionAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> reverbMixAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> stereoWidthAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dryWetAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> feedbackAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> grainPitchAttachment;
 
     void setupSlider(juce::Slider& slider, juce::Label& label, const juce::String& labelText);
 

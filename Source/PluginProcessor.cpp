@@ -43,6 +43,39 @@ juce::AudioProcessorValueTreeState::ParameterLayout GranularVerbDelayAudioProces
         juce::NormalisableRange<float>(1.0f, 100.0f, 1.0f), 20.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "grainPitch", "Grain Pitch",
+        juce::NormalisableRange<float>(0.5f, 2.0f, 0.01f), 1.0f));
+
+    // Granulator III-style controls
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "spray", "Spray",
+        juce::NormalisableRange<float>(0.0f, 200.0f, 1.0f), 20.0f,
+        juce::String(),
+        juce::AudioProcessorParameter::genericParameter,
+        [](float value, int) { return juce::String(value, 1) + " ms"; }));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "grainSizeVar", "Size Variation",
+        juce::NormalisableRange<float>(0.0f, 100.0f, 1.0f), 0.0f,
+        juce::String(),
+        juce::AudioProcessorParameter::genericParameter,
+        [](float value, int) { return juce::String(value, 0) + " %"; }));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "grainPitchVar", "Pitch Variation",
+        juce::NormalisableRange<float>(0.0f, 100.0f, 1.0f), 0.0f,
+        juce::String(),
+        juce::AudioProcessorParameter::genericParameter,
+        [](float value, int) { return juce::String(value, 0) + " %"; }));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "filePosition", "File Position",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f,
+        juce::String(),
+        juce::AudioProcessorParameter::genericParameter,
+        [](float value, int) { return juce::String(value * 100.0f, 1) + " %"; }));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "reverbMix", "Reverb Mix",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.3f));
 
@@ -57,10 +90,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout GranularVerbDelayAudioProces
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "feedback", "Feedback",
         juce::NormalisableRange<float>(0.0f, 0.95f, 0.01f), 0.4f));
-
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "grainPitch", "Grain Pitch",
-        juce::NormalisableRange<float>(0.5f, 2.0f, 0.01f), 1.0f));
 
     return { params.begin(), params.end() };
 }
@@ -190,6 +219,12 @@ void GranularVerbDelayAudioProcessor::updateGrains(int numSamples)
     auto grainPitch = apvts.getRawParameterValue("grainPitch")->load();
     auto delayTime = apvts.getRawParameterValue("delayTime")->load();
 
+    // Granulator III-style parameters
+    auto spray = apvts.getRawParameterValue("spray")->load();
+    auto grainSizeVar = apvts.getRawParameterValue("grainSizeVar")->load();
+    auto grainPitchVar = apvts.getRawParameterValue("grainPitchVar")->load();
+    auto filePosition = apvts.getRawParameterValue("filePosition")->load();
+
     grainPositions.clear();
 
     // Calculate grains per second, then samples between grain spawns
@@ -198,7 +233,11 @@ void GranularVerbDelayAudioProcessor::updateGrains(int numSamples)
     float spawnChance = 1.0f / samplesPerGrain;
 
     const int delayBufferSize = delayBuffer.getNumSamples();
-    int delayOffset = static_cast<int>(delayTime * getSampleRate());
+
+    // File position determines where in the delay buffer grains spawn
+    // 0.0 = oldest audio, 1.0 = newest audio (like M4L's file position)
+    int filePositionSamples = static_cast<int>(filePosition * delayTime * getSampleRate());
+    int baseReadPos = (writePosition - filePositionSamples + delayBufferSize) % delayBufferSize;
 
     for (auto& grain : grains)
     {
@@ -216,17 +255,26 @@ void GranularVerbDelayAudioProcessor::updateGrains(int numSamples)
             // Spawn new grain
             grain.active = true;
             grain.age = 0.0;
-            grain.lifetime = (grainSize / 1000.0) * getSampleRate();  // Convert ms to samples
-            grain.playbackSpeed = grainPitch;
 
-            // Add some randomization for richer sound (like M4L spray parameter)
-            float spray = (randomDistribution(randomEngine) - 0.5f) * 0.1f;  // ±10% variation
+            // Grain size with variation (like M4L)
+            float sizeVariation = 1.0f + ((randomDistribution(randomEngine) - 0.5f) * 2.0f * grainSizeVar / 100.0f);
+            grain.lifetime = (grainSize * sizeVariation / 1000.0) * getSampleRate();
+            grain.lifetime = std::max(10.0, grain.lifetime);  // Minimum 10 samples
+
+            // Grain pitch with variation (like M4L)
+            float pitchVariation = 1.0f + ((randomDistribution(randomEngine) - 0.5f) * 2.0f * grainPitchVar / 100.0f);
+            grain.playbackSpeed = grainPitch * pitchVariation;
+            grain.playbackSpeed = juce::jlimit(0.1, 4.0, grain.playbackSpeed);  // Clamp
+
+            // Amplitude randomization for organic sound
             grain.amplitude = 0.8f + randomDistribution(randomEngine) * 0.4f;  // 0.8 to 1.2
 
-            // Set initial read position with slight randomization
-            int basePos = (writePosition - delayOffset + delayBufferSize) % delayBufferSize;
-            int sprayOffset = static_cast<int>(spray * getSampleRate() * 0.1);  // Max 100ms spray
-            grain.readPosition = (basePos + sprayOffset + delayBufferSize) % delayBufferSize;
+            // Spray parameter - position randomization in milliseconds
+            float sprayAmount = (randomDistribution(randomEngine) - 0.5f) * 2.0f;  // -1 to +1
+            int sprayOffset = static_cast<int>(sprayAmount * spray * getSampleRate() / 1000.0f);
+
+            // Set initial read position with spray randomization
+            grain.readPosition = (baseReadPos + sprayOffset + delayBufferSize) % delayBufferSize;
 
             grainPositions.push_back(static_cast<float>(grain.readPosition) / delayBufferSize);
         }
