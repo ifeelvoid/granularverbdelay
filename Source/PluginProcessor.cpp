@@ -32,64 +32,64 @@ juce::AudioProcessorValueTreeState::ParameterLayout GranularVerbDelayAudioProces
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "delayTime", "Delay Time",
-        juce::NormalisableRange<float>(0.01f, 2.0f, 0.01f), 0.5f));
+        juce::NormalisableRange<float>(0.01f, 2.0f, 0.01f), 0.25f)); // 250ms - shorter, more manageable
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "grainSize", "Grain Size",
-        juce::NormalisableRange<float>(10.0f, 500.0f, 1.0f), 100.0f));
+        juce::NormalisableRange<float>(10.0f, 500.0f, 1.0f), 80.0f)); // 80ms - medium grains
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "grainDensity", "Grain Density",
-        juce::NormalisableRange<float>(1.0f, 100.0f, 1.0f), 20.0f));
+        juce::NormalisableRange<float>(1.0f, 100.0f, 1.0f), 8.0f)); // 8 grains/sec - less intense
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "grainPitch", "Grain Pitch",
-        juce::NormalisableRange<float>(0.5f, 2.0f, 0.01f), 1.0f));
+        juce::NormalisableRange<float>(0.5f, 2.0f, 0.01f), 1.0f)); // Normal pitch
 
     // Granulator III-style controls
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "spray", "Spray",
-        juce::NormalisableRange<float>(0.0f, 200.0f, 1.0f), 20.0f,
+        juce::NormalisableRange<float>(0.0f, 200.0f, 1.0f), 5.0f, // 5ms - minimal randomization
         juce::String(),
         juce::AudioProcessorParameter::genericParameter,
         [](float value, int) { return juce::String(value, 1) + " ms"; }));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "grainSizeVar", "Size Variation",
-        juce::NormalisableRange<float>(0.0f, 100.0f, 1.0f), 0.0f,
+        juce::NormalisableRange<float>(0.0f, 100.0f, 1.0f), 0.0f, // No variation by default
         juce::String(),
         juce::AudioProcessorParameter::genericParameter,
         [](float value, int) { return juce::String(value, 0) + " %"; }));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "grainPitchVar", "Pitch Variation",
-        juce::NormalisableRange<float>(0.0f, 100.0f, 1.0f), 0.0f,
+        juce::NormalisableRange<float>(0.0f, 100.0f, 1.0f), 0.0f, // No variation by default
         juce::String(),
         juce::AudioProcessorParameter::genericParameter,
         [](float value, int) { return juce::String(value, 0) + " %"; }));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "filePosition", "File Position",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f,
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.75f, // 75% - closer to recent audio
         juce::String(),
         juce::AudioProcessorParameter::genericParameter,
         [](float value, int) { return juce::String(value * 100.0f, 1) + " %"; }));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "reverbMix", "Reverb Mix",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.3f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.15f)); // 15% - subtle reverb
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "stereoWidth", "Stereo Width",
-        juce::NormalisableRange<float>(0.0f, 2.0f, 0.01f), 1.0f));
+        juce::NormalisableRange<float>(0.0f, 2.0f, 0.01f), 1.0f)); // 100% - normal stereo
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "dryWet", "Dry/Wet",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.35f)); // 35% - more dry
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "feedback", "Feedback",
-        juce::NormalisableRange<float>(0.0f, 0.95f, 0.01f), 0.4f));
+        juce::NormalisableRange<float>(0.0f, 0.95f, 0.01f), 0.25f)); // 25% - less feedback
 
     return { params.begin(), params.end() };
 }
