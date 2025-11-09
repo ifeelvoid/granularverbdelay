@@ -10,7 +10,7 @@ class WaveformDisplay : public juce::Component, public juce::Timer
 public:
     WaveformDisplay(GranularVerbDelayAudioProcessor& p) : processor(p)
     {
-        startTimerHz(30); // 30 FPS update rate
+        startTimerHz(15); // 15 FPS update rate - smoother, less frenetic
         setInterceptsMouseClicks(true, false);
         setMouseCursor(juce::MouseCursor::CrosshairCursor);
     }
