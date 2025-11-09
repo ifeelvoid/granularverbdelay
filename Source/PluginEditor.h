@@ -295,6 +295,9 @@ private:
     juce::Slider dryWetSlider;
     juce::Slider feedbackSlider;
 
+    juce::ComboBox delayModeBox;
+    juce::ComboBox reverbTypeBox;
+
     juce::Label delayTimeLabel;
     juce::Label grainSizeLabel;
     juce::Label grainDensityLabel;
@@ -307,6 +310,8 @@ private:
     juce::Label stereoWidthLabel;
     juce::Label dryWetLabel;
     juce::Label feedbackLabel;
+    juce::Label delayModeLabel;
+    juce::Label reverbTypeLabel;
 
     // Attachments
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayTimeAttachment;
@@ -321,8 +326,11 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> stereoWidthAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dryWetAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> feedbackAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> delayModeAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> reverbTypeAttachment;
 
     void setupSlider(juce::Slider& slider, juce::Label& label, const juce::String& labelText);
+    void setupComboBox(juce::ComboBox& comboBox, juce::Label& label, const juce::String& labelText, const juce::StringArray& items);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GranularVerbDelayAudioProcessorEditor)
 };

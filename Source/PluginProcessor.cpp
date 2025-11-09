@@ -91,6 +91,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout GranularVerbDelayAudioProces
         "feedback", "Feedback",
         juce::NormalisableRange<float>(0.0f, 0.95f, 0.01f), 0.25f)); // 25% - less feedback
 
+    // Delay mode (stereo/ping pong)
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "delayMode", "Delay Mode",
+        juce::StringArray("Stereo", "Ping Pong"), 0)); // Default: Stereo
+
+    // Reverb type (plate/hall)
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "reverbType", "Reverb Type",
+        juce::StringArray("Plate", "Hall", "Room"), 0)); // Default: Plate
+
     return { params.begin(), params.end() };
 }
 
@@ -310,6 +320,9 @@ void GranularVerbDelayAudioProcessor::processGranularDelay(juce::AudioBuffer<flo
     auto feedback = apvts.getRawParameterValue("feedback")->load();
     feedback = juce::jlimit(0.0f, 0.95f, feedback);  // Clamp feedback to prevent runaway
 
+    auto delayMode = apvts.getRawParameterValue("delayMode")->load();
+    bool isPingPong = (static_cast<int>(delayMode) == 1); // 1 = Ping Pong
+
     updateGrains(numSamples);
 
     for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
@@ -319,13 +332,21 @@ void GranularVerbDelayAudioProcessor::processGranularDelay(juce::AudioBuffer<flo
 
         for (int i = 0; i < numSamples; ++i)
         {
-            // First, write input to delay buffer (no feedback yet)
+            // First, write input to delay buffer
             int writeIndex = (writePosition + i) % delayBufferSize;
             float inputSample = channelData[i];
 
             // Read from active grains
             float grainOutput = 0.0f;
             int activeGrainCount = 0;
+
+            // For ping pong, alternate which channel reads grains
+            int grainChannel = channel;
+            if (isPingPong && buffer.getNumChannels() == 2)
+            {
+                // Ping pong effect: grains alternate between L and R
+                grainChannel = ((writePosition + i) / 100) % 2; // Change channel every 100 samples
+            }
 
             for (auto& grain : grains)
             {
@@ -348,9 +369,18 @@ void GranularVerbDelayAudioProcessor::processGranularDelay(juce::AudioBuffer<flo
                     int readIndex1 = (readIndex0 + 1) % delayBufferSize;
                     float frac = static_cast<float>(readPos - std::floor(readPos));
 
+                    // For ping pong, read from appropriate channel based on grain position
+                    int readChannel = channel;
+                    if (isPingPong && buffer.getNumChannels() == 2)
+                    {
+                        readChannel = grainChannel;
+                    }
+
+                    auto* readDelayData = delayBuffer.getReadPointer(readChannel);
+
                     // Interpolated read from delay buffer
-                    float sample0 = delayData[readIndex0];
-                    float sample1 = delayData[readIndex1];
+                    float sample0 = readDelayData[readIndex0];
+                    float sample1 = readDelayData[readIndex1];
                     float sample = sample0 + frac * (sample1 - sample0);
 
                     grainOutput += sample * envelope * grain.amplitude;
@@ -371,6 +401,17 @@ void GranularVerbDelayAudioProcessor::processGranularDelay(juce::AudioBuffer<flo
             // Normalize grain output to prevent volume buildup
             if (activeGrainCount > 0)
                 grainOutput *= 1.0f / std::sqrt(static_cast<float>(activeGrainCount));
+
+            // For ping pong, cross-feed between channels
+            if (isPingPong && buffer.getNumChannels() == 2)
+            {
+                int otherChannel = 1 - channel;
+                auto* otherDelayData = delayBuffer.getWritePointer(otherChannel);
+                int otherWriteIndex = writeIndex;
+
+                // Write to opposite channel with feedback for ping pong effect
+                otherDelayData[otherWriteIndex] = inputSample * 0.5f + grainOutput * feedback * 0.7f;
+            }
 
             // Write grain output back to delay buffer with feedback
             delayData[writeIndex] = inputSample + grainOutput * feedback;
@@ -402,12 +443,47 @@ void GranularVerbDelayAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
 
     // Apply reverb
     auto reverbMix = apvts.getRawParameterValue("reverbMix")->load();
+    auto reverbType = static_cast<int>(apvts.getRawParameterValue("reverbType")->load());
+
     if (reverbMix > 0.01f)
     {
         juce::dsp::AudioBlock<float> block(buffer);
         juce::dsp::ProcessContextReplacing<float> context(block);
 
-        juce::Reverb::Parameters reverbParams = reverb.getParameters();
+        juce::Reverb::Parameters reverbParams;
+
+        // Configure reverb based on type
+        switch (reverbType)
+        {
+            case 0: // Plate
+                reverbParams.roomSize = 0.5f;
+                reverbParams.damping = 0.3f;
+                reverbParams.width = 0.95f;
+                reverbParams.freezeMode = 0.0f;
+                break;
+
+            case 1: // Hall
+                reverbParams.roomSize = 0.85f;
+                reverbParams.damping = 0.6f;
+                reverbParams.width = 1.0f;
+                reverbParams.freezeMode = 0.0f;
+                break;
+
+            case 2: // Room
+                reverbParams.roomSize = 0.3f;
+                reverbParams.damping = 0.5f;
+                reverbParams.width = 0.8f;
+                reverbParams.freezeMode = 0.0f;
+                break;
+
+            default:
+                reverbParams.roomSize = 0.5f;
+                reverbParams.damping = 0.5f;
+                reverbParams.width = 1.0f;
+                reverbParams.freezeMode = 0.0f;
+                break;
+        }
+
         reverbParams.wetLevel = reverbMix;
         reverbParams.dryLevel = 1.0f - reverbMix;
         reverb.setParameters(reverbParams);

@@ -22,6 +22,10 @@ GranularVerbDelayAudioProcessorEditor::GranularVerbDelayAudioProcessorEditor (Gr
     setupSlider(dryWetSlider, dryWetLabel, "Dry/Wet");
     setupSlider(feedbackSlider, feedbackLabel, "Feedback");
 
+    // Setup combo boxes
+    setupComboBox(delayModeBox, delayModeLabel, "Delay Mode", juce::StringArray("Stereo", "Ping Pong"));
+    setupComboBox(reverbTypeBox, reverbTypeLabel, "Reverb Type", juce::StringArray("Plate", "Hall", "Room"));
+
     // Create attachments
     delayTimeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         audioProcessor.getValueTreeState(), "delayTime", delayTimeSlider);
@@ -47,9 +51,13 @@ GranularVerbDelayAudioProcessorEditor::GranularVerbDelayAudioProcessorEditor (Gr
         audioProcessor.getValueTreeState(), "dryWet", dryWetSlider);
     feedbackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         audioProcessor.getValueTreeState(), "feedback", feedbackSlider);
+    delayModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        audioProcessor.getValueTreeState(), "delayMode", delayModeBox);
+    reverbTypeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        audioProcessor.getValueTreeState(), "reverbType", reverbTypeBox);
 
     // Set component size - taller to fit more controls
-    setSize (800, 700);
+    setSize (800, 720);
 }
 
 GranularVerbDelayAudioProcessorEditor::~GranularVerbDelayAudioProcessorEditor()
@@ -85,6 +93,28 @@ void GranularVerbDelayAudioProcessorEditor::setupSlider(juce::Slider& slider, ju
     slider.setMouseDragSensitivity(150);
 }
 
+void GranularVerbDelayAudioProcessorEditor::setupComboBox(juce::ComboBox& comboBox, juce::Label& label, const juce::String& labelText, const juce::StringArray& items)
+{
+    addAndMakeVisible(comboBox);
+    comboBox.addItemList(items, 1);
+    comboBox.setSelectedItemIndex(0);
+
+    addAndMakeVisible(label);
+    label.setText(labelText, juce::dontSendNotification);
+    label.setJustificationType(juce::Justification::centred);
+    label.attachToComponent(&comboBox, false);
+
+    // Modern styling
+    comboBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff1a1a1a));
+    comboBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffdddddd));
+    comboBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff3a3a3a));
+    comboBox.setColour(juce::ComboBox::arrowColourId, juce::Colour(0xff00d4ff));
+    comboBox.setColour(juce::ComboBox::buttonColourId, juce::Colour(0xff2a2a2a));
+
+    label.setColour(juce::Label::textColourId, juce::Colour(0xffaaaaaa));
+    label.setFont(juce::Font(14.0f, juce::Font::bold));
+}
+
 //==============================================================================
 void GranularVerbDelayAudioProcessorEditor::paint (juce::Graphics& g)
 {
@@ -109,10 +139,10 @@ void GranularVerbDelayAudioProcessorEditor::paint (juce::Graphics& g)
 
     // Draw control sections with subtle borders
     g.setColour(juce::Colour(0xff1f1f1f));
-    g.fillRoundedRectangle(10, 250, getWidth() - 20, 430, 4.0f);
+    g.fillRoundedRectangle(10, 250, getWidth() - 20, 450, 4.0f);
 
     g.setColour(juce::Colour(0xff2a2a2a));
-    g.drawRoundedRectangle(10, 250, getWidth() - 20, 430, 4.0f, 1.0f);
+    g.drawRoundedRectangle(10, 250, getWidth() - 20, 450, 4.0f, 1.0f);
 }
 
 void GranularVerbDelayAudioProcessorEditor::resized()
@@ -128,10 +158,11 @@ void GranularVerbDelayAudioProcessorEditor::resized()
     // Control section
     auto controlBounds = bounds.reduced(20);
 
-    // Create 3 rows of 4 controls each
+    // Create 3 rows of 4 controls each + 1 row for combo boxes
     auto row1 = controlBounds.removeFromTop(140);
     auto row2 = controlBounds.removeFromTop(140);
     auto row3 = controlBounds.removeFromTop(140);
+    auto row4 = controlBounds.removeFromTop(60);
 
     auto sliderWidth = row1.getWidth() / 4;
 
@@ -152,4 +183,9 @@ void GranularVerbDelayAudioProcessorEditor::resized()
     stereoWidthSlider.setBounds(row3.removeFromLeft(sliderWidth).reduced(10));
     feedbackSlider.setBounds(row3.removeFromLeft(sliderWidth).reduced(10));
     dryWetSlider.setBounds(row3.removeFromLeft(sliderWidth).reduced(10));
+
+    // Row 4: Mode/Type Selectors (combo boxes)
+    auto comboWidth = row4.getWidth() / 2;
+    delayModeBox.setBounds(row4.removeFromLeft(comboWidth).reduced(10, 5));
+    reverbTypeBox.setBounds(row4.removeFromLeft(comboWidth).reduced(10, 5));
 }

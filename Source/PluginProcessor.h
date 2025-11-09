@@ -85,6 +85,7 @@ private:
     std::vector<float> grainPositions;
 
     int writePosition = 0;
+    int pingPongWritePos = 0; // Separate write position for ping pong effect
     std::mt19937 randomEngine;
     std::uniform_real_distribution<float> randomDistribution;
 
