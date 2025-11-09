@@ -11,6 +11,69 @@ public:
     WaveformDisplay(GranularVerbDelayAudioProcessor& p) : processor(p)
     {
         startTimerHz(30); // 30 FPS update rate
+        setInterceptsMouseClicks(true, false);
+        setMouseCursor(juce::MouseCursor::CrosshairCursor);
+    }
+
+    void mouseDown(const juce::MouseEvent& event) override
+    {
+        updateGrainPositionFromMouse(event);
+    }
+
+    void mouseDrag(const juce::MouseEvent& event) override
+    {
+        updateGrainPositionFromMouse(event);
+    }
+
+    void mouseEnter(const juce::MouseEvent&) override
+    {
+        setMouseCursor(juce::MouseCursor::CrosshairCursor);
+    }
+
+    void mouseExit(const juce::MouseEvent&) override
+    {
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
+
+    void updateGrainPositionFromMouse(const juce::MouseEvent& event)
+    {
+        auto bounds = getLocalBounds();
+        int bufferSize = processor.getDelayBuffer().getNumSamples();
+        if (bufferSize == 0) return;
+
+        // Calculate which position in the buffer was clicked
+        // The display shows 2 seconds ending at writePos
+        int writePos = processor.getWritePosition();
+        int displaySamples = std::min(bufferSize, static_cast<int>(processor.getSampleRate() * 2.0));
+        int startSample = (writePos - displaySamples + bufferSize) % bufferSize;
+
+        // Convert mouse X position to sample position
+        float normalizedX = juce::jmap(static_cast<float>(event.x),
+                                       static_cast<float>(bounds.getX()),
+                                       static_cast<float>(bounds.getRight()),
+                                       0.0f, 1.0f);
+
+        // Map to the visible window
+        int clickedSample = static_cast<int>(normalizedX * displaySamples);
+        int absoluteSample = (startSample + clickedSample) % bufferSize;
+
+        // Convert to file position (0.0 = oldest, 1.0 = newest)
+        // absoluteSample is where user clicked, writePos is newest
+        int samplesFromWrite = (writePos - absoluteSample + bufferSize) % bufferSize;
+
+        // Get delay time to scale properly
+        auto delayTime = processor.getValueTreeState().getRawParameterValue("delayTime")->load();
+        int maxDelaySamples = static_cast<int>(delayTime * processor.getSampleRate());
+
+        // Calculate file position (how far back from write position)
+        float filePosition = 1.0f - (static_cast<float>(samplesFromWrite) / maxDelaySamples);
+        filePosition = juce::jlimit(0.0f, 1.0f, filePosition);
+
+        // Set the file position parameter
+        if (auto* param = processor.getValueTreeState().getParameter("filePosition"))
+        {
+            param->setValueNotifyingHost(filePosition);
+        }
     }
 
     void paint(juce::Graphics& g) override
@@ -75,6 +138,30 @@ public:
         g.setColour(juce::Colour(0xff00ff00).withAlpha(0.8f));
         g.drawLine(writeX, fullBounds.getY(), writeX, fullBounds.getBottom(), 3.0f);
 
+        // Draw file position marker (where grains spawn)
+        auto filePosition = processor.getValueTreeState().getRawParameterValue("filePosition")->load();
+        auto delayTime = processor.getValueTreeState().getRawParameterValue("delayTime")->load();
+
+        // Calculate where file position appears on screen
+        int filePositionSamples = static_cast<int>(filePosition * delayTime * processor.getSampleRate());
+        int fileReadPos = (writePos - filePositionSamples + bufferSize) % bufferSize;
+        int relativeFilePos = (fileReadPos - startSample + bufferSize) % bufferSize;
+
+        if (relativeFilePos >= 0 && relativeFilePos <= displaySamples)
+        {
+            auto fileX = juce::jmap(static_cast<float>(relativeFilePos), 0.0f, static_cast<float>(displaySamples),
+                                   static_cast<float>(fullBounds.getX()), static_cast<float>(fullBounds.getRight()));
+
+            // Draw bright marker line
+            g.setColour(juce::Colour(0xffff00ff).withAlpha(0.9f));
+            g.drawLine(fileX, fullBounds.getY(), fileX, fullBounds.getBottom(), 4.0f);
+
+            // Draw label
+            g.setColour(juce::Colour(0xffff00ff));
+            g.setFont(juce::Font(10.0f, juce::Font::bold));
+            g.drawText("SPAWN", fileX - 25, fullBounds.getY() + fullBounds.getHeight() - 18, 50, 14, juce::Justification::centred);
+        }
+
         // Draw border
         g.setColour(juce::Colour(0xff404040));
         g.drawRect(getLocalBounds(), 2);
@@ -83,6 +170,7 @@ public:
         g.setColour(juce::Colour(0xffaaaaaa));
         g.setFont(juce::Font(11.0f, juce::Font::bold));
         g.drawText("← 2 SECONDS →", fullBounds.getX() + 8, fullBounds.getY() + 4, 120, 14, juce::Justification::left);
+        g.drawText("CLICK TO SET SPAWN POINT", fullBounds.getRight() - 200, fullBounds.getY() + 4, 192, 14, juce::Justification::right);
     }
 
     void drawChannel(juce::Graphics& g, juce::Rectangle<int> bounds,
