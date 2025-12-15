@@ -17,12 +17,28 @@ public:
 
     void mouseDown(const juce::MouseEvent& event) override
     {
-        updateGrainPositionFromMouse(event);
+        // Check if clicking on spawn marker to drag it
+        auto spawnX = getSpawnMarkerX();
+        if (spawnX >= 0 && std::abs(event.x - spawnX) < 15)
+        {
+            isDraggingSpawnMarker = true;
+            setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+        }
+        else
+        {
+            updateGrainPositionFromMouse(event);
+        }
     }
 
     void mouseDrag(const juce::MouseEvent& event) override
     {
         updateGrainPositionFromMouse(event);
+    }
+
+    void mouseUp(const juce::MouseEvent& event) override
+    {
+        isDraggingSpawnMarker = false;
+        setMouseCursor(juce::MouseCursor::CrosshairCursor);
     }
 
     void mouseEnter(const juce::MouseEvent&) override
@@ -33,6 +49,46 @@ public:
     void mouseExit(const juce::MouseEvent&) override
     {
         setMouseCursor(juce::MouseCursor::NormalCursor);
+        isDraggingSpawnMarker = false;
+    }
+
+    void mouseMove(const juce::MouseEvent& event) override
+    {
+        // Change cursor when hovering over spawn marker
+        auto spawnX = getSpawnMarkerX();
+        if (spawnX >= 0 && std::abs(event.x - spawnX) < 15)
+        {
+            setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        }
+        else
+        {
+            setMouseCursor(juce::MouseCursor::CrosshairCursor);
+        }
+    }
+
+    float getSpawnMarkerX()
+    {
+        auto bounds = getLocalBounds();
+        int bufferSize = processor.getDelayBuffer().getNumSamples();
+        if (bufferSize == 0) return -1;
+
+        int writePos = processor.getWritePosition();
+        int displaySamples = std::min(bufferSize, static_cast<int>(processor.getSampleRate() * 2.0));
+        int startSample = (writePos - displaySamples + bufferSize) % bufferSize;
+
+        auto filePosition = processor.getValueTreeState().getRawParameterValue("filePosition")->load();
+        auto delayTime = processor.getValueTreeState().getRawParameterValue("delayTime")->load();
+
+        int filePositionSamples = static_cast<int>(filePosition * delayTime * processor.getSampleRate());
+        int fileReadPos = (writePos - filePositionSamples + bufferSize) % bufferSize;
+        int relativeFilePos = (fileReadPos - startSample + bufferSize) % bufferSize;
+
+        if (relativeFilePos >= 0 && relativeFilePos <= displaySamples)
+        {
+            return juce::jmap(static_cast<float>(relativeFilePos), 0.0f, static_cast<float>(displaySamples),
+                            static_cast<float>(bounds.getX()), static_cast<float>(bounds.getRight()));
+        }
+        return -1;
     }
 
     void updateGrainPositionFromMouse(const juce::MouseEvent& event)
@@ -103,6 +159,57 @@ public:
         drawChannel(g, leftChannelBounds, delayBuffer, 0, startSample, displaySamples, bufferSize, "L");
         drawChannel(g, rightChannelBounds, delayBuffer, 1, startSample, displaySamples, bufferSize, "R");
 
+        // Draw spray zone overlay (like Ableton Granulator)
+        auto filePosition = processor.getValueTreeState().getRawParameterValue("filePosition")->load();
+        auto delayTime = processor.getValueTreeState().getRawParameterValue("delayTime")->load();
+        auto spray = processor.getValueTreeState().getRawParameterValue("spray")->load();
+
+        // Calculate spawn position and spray zone
+        int filePositionSamples = static_cast<int>(filePosition * delayTime * processor.getSampleRate());
+        int fileReadPos = (writePos - filePositionSamples + bufferSize) % bufferSize;
+        int relativeFilePos = (fileReadPos - startSample + bufferSize) % bufferSize;
+
+        // Convert spray from milliseconds to samples
+        int spraySamples = static_cast<int>(spray * processor.getSampleRate() / 1000.0f);
+
+        if (relativeFilePos >= 0 && relativeFilePos <= displaySamples)
+        {
+            auto fullBounds = getLocalBounds();
+
+            // Calculate spray zone boundaries
+            int sprayStart = std::max(0, relativeFilePos - spraySamples);
+            int sprayEnd = std::min(displaySamples, relativeFilePos + spraySamples);
+
+            float sprayStartX = juce::jmap(static_cast<float>(sprayStart), 0.0f, static_cast<float>(displaySamples),
+                                          static_cast<float>(fullBounds.getX()), static_cast<float>(fullBounds.getRight()));
+            float sprayEndX = juce::jmap(static_cast<float>(sprayEnd), 0.0f, static_cast<float>(displaySamples),
+                                        static_cast<float>(fullBounds.getX()), static_cast<float>(fullBounds.getRight()));
+
+            // Draw spray zone as translucent overlay
+            juce::Rectangle<float> sprayZone(sprayStartX, fullBounds.getY(),
+                                            sprayEndX - sprayStartX, fullBounds.getHeight());
+
+            // Gradient overlay for spray zone
+            g.setGradientFill(juce::ColourGradient(
+                juce::Colour(0xffff00ff).withAlpha(0.15f), sprayZone.getCentreX(), fullBounds.getY(),
+                juce::Colour(0xffff00ff).withAlpha(0.05f), sprayZone.getCentreX(), fullBounds.getBottom(), false));
+            g.fillRect(sprayZone);
+
+            // Draw spray zone borders
+            g.setColour(juce::Colour(0xffff00ff).withAlpha(0.4f));
+            g.drawVerticalLine(sprayStartX, fullBounds.getY(), fullBounds.getBottom());
+            g.drawVerticalLine(sprayEndX, fullBounds.getY(), fullBounds.getBottom());
+
+            // Draw dotted lines for spray boundaries
+            float dash[] = {3.0f, 3.0f};
+            g.setColour(juce::Colour(0xffff00ff).withAlpha(0.6f));
+            for (float y = fullBounds.getY(); y < fullBounds.getBottom(); y += 6.0f)
+            {
+                g.drawLine(sprayStartX, y, sprayStartX, y + 3.0f, 1.0f);
+                g.drawLine(sprayEndX, y, sprayEndX, y + 3.0f, 1.0f);
+            }
+        }
+
         // Draw grain positions on top
         auto fullBounds = getLocalBounds();
         auto& grainPositions = processor.getGrainPositions();
@@ -138,39 +245,68 @@ public:
         g.setColour(juce::Colour(0xff00ff00).withAlpha(0.8f));
         g.drawLine(writeX, fullBounds.getY(), writeX, fullBounds.getBottom(), 3.0f);
 
-        // Draw file position marker (where grains spawn)
-        auto filePosition = processor.getValueTreeState().getRawParameterValue("filePosition")->load();
-        auto delayTime = processor.getValueTreeState().getRawParameterValue("delayTime")->load();
+        // Draw file position marker (where grains spawn) - Ableton style
+        filePosition = processor.getValueTreeState().getRawParameterValue("filePosition")->load();
+        delayTime = processor.getValueTreeState().getRawParameterValue("delayTime")->load();
 
         // Calculate where file position appears on screen
-        int filePositionSamples = static_cast<int>(filePosition * delayTime * processor.getSampleRate());
-        int fileReadPos = (writePos - filePositionSamples + bufferSize) % bufferSize;
-        int relativeFilePos = (fileReadPos - startSample + bufferSize) % bufferSize;
+        filePositionSamples = static_cast<int>(filePosition * delayTime * processor.getSampleRate());
+        fileReadPos = (writePos - filePositionSamples + bufferSize) % bufferSize;
+        relativeFilePos = (fileReadPos - startSample + bufferSize) % bufferSize;
 
         if (relativeFilePos >= 0 && relativeFilePos <= displaySamples)
         {
             auto fileX = juce::jmap(static_cast<float>(relativeFilePos), 0.0f, static_cast<float>(displaySamples),
                                    static_cast<float>(fullBounds.getX()), static_cast<float>(fullBounds.getRight()));
 
-            // Draw bright marker line
-            g.setColour(juce::Colour(0xffff00ff).withAlpha(0.9f));
-            g.drawLine(fileX, fullBounds.getY(), fileX, fullBounds.getBottom(), 4.0f);
-
-            // Draw label
+            // Draw thick bright marker line
             g.setColour(juce::Colour(0xffff00ff));
-            g.setFont(juce::Font(10.0f, juce::Font::bold));
-            g.drawText("SPAWN", fileX - 25, fullBounds.getY() + fullBounds.getHeight() - 18, 50, 14, juce::Justification::centred);
+            g.drawLine(fileX, fullBounds.getY(), fileX, fullBounds.getBottom(), 3.0f);
+
+            // Draw draggable handle at top (triangle)
+            juce::Path triangleHandle;
+            triangleHandle.addTriangle(fileX - 8, fullBounds.getY() + 2,
+                                      fileX + 8, fullBounds.getY() + 2,
+                                      fileX, fullBounds.getY() + 14);
+
+            g.setColour(juce::Colour(0xffff00ff));
+            g.fillPath(triangleHandle);
+
+            // White outline for handle
+            g.setColour(juce::Colour(0xffffffff));
+            g.strokePath(triangleHandle, juce::PathStrokeType(1.5f));
+
+            // Draw label at bottom
+            g.setColour(juce::Colour(0xffff00ff));
+            g.setFont(juce::Font(11.0f, juce::Font::bold));
+
+            // Background for label
+            juce::Rectangle<float> labelBg(fileX - 28, fullBounds.getBottom() - 18, 56, 16);
+            g.setColour(juce::Colour(0xff000000).withAlpha(0.7f));
+            g.fillRoundedRectangle(labelBg, 3.0f);
+
+            g.setColour(juce::Colour(0xffff00ff));
+            g.drawText("SPAWN", fileX - 28, fullBounds.getBottom() - 18, 56, 16, juce::Justification::centred);
         }
 
         // Draw border
         g.setColour(juce::Colour(0xff404040));
         g.drawRect(getLocalBounds(), 2);
 
-        // Draw info text
+        // Draw info text with better instructions
         g.setColour(juce::Colour(0xffaaaaaa));
-        g.setFont(juce::Font(11.0f, juce::Font::bold));
-        g.drawText("← 2 SECONDS →", fullBounds.getX() + 8, fullBounds.getY() + 4, 120, 14, juce::Justification::left);
-        g.drawText("CLICK TO SET SPAWN POINT", fullBounds.getRight() - 200, fullBounds.getY() + 4, 192, 14, juce::Justification::right);
+        g.setFont(juce::Font(10.0f, juce::Font::bold));
+        g.drawText("← 2 SECONDS →", fullBounds.getX() + 8, fullBounds.getY() + 4, 100, 12, juce::Justification::left);
+
+        g.setColour(juce::Colour(0xffff00ff).withAlpha(0.8f));
+        g.drawText("DRAG SPAWN MARKER OR CLICK", fullBounds.getRight() - 195, fullBounds.getY() + 4, 187, 12, juce::Justification::right);
+
+        // Show spray zone width
+        g.setColour(juce::Colour(0xffaaaaaa).withAlpha(0.8f));
+        g.setFont(juce::Font(9.0f));
+        auto sprayValue = processor.getValueTreeState().getRawParameterValue("spray")->load();
+        g.drawText(juce::String("Spray: ±") + juce::String(sprayValue, 1) + " ms",
+                  fullBounds.getX() + 8, fullBounds.getY() + 18, 120, 12, juce::Justification::left);
     }
 
     void drawChannel(juce::Graphics& g, juce::Rectangle<int> bounds,
@@ -263,6 +399,7 @@ public:
 
 private:
     GranularVerbDelayAudioProcessor& processor;
+    bool isDraggingSpawnMarker = false;
 };
 
 //==============================================================================
