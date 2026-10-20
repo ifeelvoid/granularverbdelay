@@ -101,6 +101,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout GranularVerbDelayAudioProces
         "reverbType", "Reverb Type",
         juce::StringArray("Plate", "Hall", "Room"), 0)); // Default: Plate
 
+    // Grain direction (forward/reverse)
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "grainDirection", "Grain Direction",
+        juce::StringArray("Forward", "Reverse", "Random"), 0)); // Default: Forward
+
+    // Reverb freeze mode
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        "reverbFreeze", "Reverb Freeze", false)); // Default: Off
+
     return { params.begin(), params.end() };
 }
 
@@ -234,6 +243,7 @@ void GranularVerbDelayAudioProcessor::updateGrains(int numSamples)
     auto grainSizeVar = apvts.getRawParameterValue("grainSizeVar")->load();
     auto grainPitchVar = apvts.getRawParameterValue("grainPitchVar")->load();
     auto filePosition = apvts.getRawParameterValue("filePosition")->load();
+    auto grainDirection = static_cast<int>(apvts.getRawParameterValue("grainDirection")->load());
 
     grainPositions.clear();
 
@@ -274,7 +284,19 @@ void GranularVerbDelayAudioProcessor::updateGrains(int numSamples)
             // Grain pitch with variation (like M4L)
             float pitchVariation = 1.0f + ((randomDistribution(randomEngine) - 0.5f) * 2.0f * grainPitchVar / 100.0f);
             grain.playbackSpeed = grainPitch * pitchVariation;
-            grain.playbackSpeed = juce::jlimit(0.1, 4.0, grain.playbackSpeed);  // Clamp
+
+            // Apply grain direction (0=Forward, 1=Reverse, 2=Random)
+            if (grainDirection == 1) // Reverse
+            {
+                grain.playbackSpeed = -grain.playbackSpeed;
+            }
+            else if (grainDirection == 2) // Random
+            {
+                if (randomDistribution(randomEngine) > 0.5f)
+                    grain.playbackSpeed = -grain.playbackSpeed;
+            }
+
+            grain.playbackSpeed = juce::jlimit(-4.0, 4.0, grain.playbackSpeed);  // Clamp
 
             // Amplitude randomization for organic sound
             grain.amplitude = 0.8f + randomDistribution(randomEngine) * 0.4f;  // 0.8 to 1.2
@@ -444,6 +466,7 @@ void GranularVerbDelayAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     // Apply reverb
     auto reverbMix = apvts.getRawParameterValue("reverbMix")->load();
     auto reverbType = static_cast<int>(apvts.getRawParameterValue("reverbType")->load());
+    auto reverbFreeze = apvts.getRawParameterValue("reverbFreeze")->load() > 0.5f;
 
     if (reverbMix > 0.01f)
     {
@@ -459,30 +482,29 @@ void GranularVerbDelayAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
                 reverbParams.roomSize = 0.5f;
                 reverbParams.damping = 0.3f;
                 reverbParams.width = 0.95f;
-                reverbParams.freezeMode = 0.0f;
                 break;
 
             case 1: // Hall
                 reverbParams.roomSize = 0.85f;
                 reverbParams.damping = 0.6f;
                 reverbParams.width = 1.0f;
-                reverbParams.freezeMode = 0.0f;
                 break;
 
             case 2: // Room
                 reverbParams.roomSize = 0.3f;
                 reverbParams.damping = 0.5f;
                 reverbParams.width = 0.8f;
-                reverbParams.freezeMode = 0.0f;
                 break;
 
             default:
                 reverbParams.roomSize = 0.5f;
                 reverbParams.damping = 0.5f;
                 reverbParams.width = 1.0f;
-                reverbParams.freezeMode = 0.0f;
                 break;
         }
+
+        // Apply freeze mode if enabled
+        reverbParams.freezeMode = reverbFreeze ? 1.0f : 0.0f;
 
         reverbParams.wetLevel = reverbMix;
         reverbParams.dryLevel = 1.0f - reverbMix;

@@ -413,6 +413,9 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    // Window constraints for resizing
+    juce::ComponentBoundsConstrainer resizeConstraints;
+
 private:
     GranularVerbDelayAudioProcessor& audioProcessor;
 
@@ -434,6 +437,12 @@ private:
 
     juce::ComboBox delayModeBox;
     juce::ComboBox reverbTypeBox;
+    juce::ComboBox grainDirectionBox;
+    juce::TextButton reverbFreezeButton;
+
+    juce::TextButton savePresetButton;
+    juce::TextButton loadPresetButton;
+    juce::ComboBox presetBox;
 
     juce::Label delayTimeLabel;
     juce::Label grainSizeLabel;
@@ -449,6 +458,8 @@ private:
     juce::Label feedbackLabel;
     juce::Label delayModeLabel;
     juce::Label reverbTypeLabel;
+    juce::Label grainDirectionLabel;
+    juce::Label reverbFreezeLabel;
 
     // Attachments
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayTimeAttachment;
@@ -465,9 +476,20 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> feedbackAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> delayModeAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> reverbTypeAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> grainDirectionAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> reverbFreezeAttachment;
 
     void setupSlider(juce::Slider& slider, juce::Label& label, const juce::String& labelText);
     void setupComboBox(juce::ComboBox& comboBox, juce::Label& label, const juce::String& labelText, const juce::StringArray& items);
+    void setupButton(juce::TextButton& button, juce::Label& label, const juce::String& labelText);
+
+    void savePreset();
+    void loadPreset(int presetIndex);
+    void refreshPresetList();
+    juce::File getPresetDirectory();
+
+    // Resize corner
+    std::unique_ptr<juce::ResizableCornerComponent> resizer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GranularVerbDelayAudioProcessorEditor)
 };
